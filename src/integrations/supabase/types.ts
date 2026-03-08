@@ -72,7 +72,9 @@ export type Database = {
         Row: {
           ai_generated: boolean | null
           created_at: string
+          day_of_week: string | null
           id: string
+          image_url: string | null
           item_ids: string[]
           notes: string | null
           occasion: string | null
@@ -83,7 +85,9 @@ export type Database = {
         Insert: {
           ai_generated?: boolean | null
           created_at?: string
+          day_of_week?: string | null
           id?: string
+          image_url?: string | null
           item_ids: string[]
           notes?: string | null
           occasion?: string | null
@@ -94,7 +98,9 @@ export type Database = {
         Update: {
           ai_generated?: boolean | null
           created_at?: string
+          day_of_week?: string | null
           id?: string
+          image_url?: string | null
           item_ids?: string[]
           notes?: string | null
           occasion?: string | null
