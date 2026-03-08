@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { useClothingItems, useOutfitPlans, useUpsertOutfitPlan, ClothingItemRow } from "@/hooks/useWardrobe";
+import { useClothingItems, useOutfitPlans, useUpsertOutfitPlan, useAddOutfitHistory, ClothingItemRow } from "@/hooks/useWardrobe";
+import { useAuth } from "@/contexts/AuthContext";
 import { Link } from "react-router-dom";
 import { DAYS } from "@/lib/types";
 import ClothingCard from "@/components/ClothingCard";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Sparkles, X, Plus, CalendarCheck, Loader2, Image as ImageIcon } from "lucide-react";
+import { Sparkles, X, Plus, CalendarCheck, Loader2, Image as ImageIcon, CheckCircle2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { startOfWeek, format } from "date-fns";
