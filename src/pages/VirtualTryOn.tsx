@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useClothingItems, ClothingItemRow } from "@/hooks/useWardrobe";
+import { useClothingItems, useUpsertOutfitPlan, ClothingItemRow } from "@/hooks/useWardrobe";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import ClothingCard from "@/components/ClothingCard";
@@ -12,11 +12,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import {
   Image as ImageIcon, Loader2, X, Shirt, RotateCcw,
   Heart, Share2, Trash2, Globe, Lock, Copy, Check,
-  Camera, Upload, UserCircle,
+  Camera, Upload, UserCircle, CalendarPlus,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { CATEGORIES } from "@/lib/types";
+import { CATEGORIES, DAYS } from "@/lib/types";
+import { startOfWeek, format } from "date-fns";
 
 const STYLE_OPTIONS = [
   { value: "modern editorial", label: "Editorial" },
@@ -155,6 +156,7 @@ export default function VirtualTryOn() {
   const togglePublic = useTogglePublic();
   const deleteGalleryItem = useDeleteGalleryItem();
   const uploadPhoto = useUploadUserPhoto();
+  const upsertPlan = useUpsertOutfitPlan();
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [style, setStyle] = useState("modern editorial");
@@ -166,6 +168,8 @@ export default function VirtualTryOn() {
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [shareDialogItem, setShareDialogItem] = useState<GalleryItem | null>(null);
   const [copied, setCopied] = useState(false);
+  const [plannerDay, setPlannerDay] = useState<string | null>(null);
+  const [addingToPlanner, setAddingToPlanner] = useState(false);
 
   // User photo state
   const [userPhotoUrl, setUserPhotoUrl] = useState<string | null>(null);
@@ -281,7 +285,43 @@ export default function VirtualTryOn() {
     }
   };
 
-  const handleShare = (item: GalleryItem) => {
+  const handleAddToPlanner = async (day: string) => {
+    if (!tryOnImage || selectedItems.length === 0) return;
+    setAddingToPlanner(true);
+    try {
+      // Upload the try-on image to storage for the planner preview
+      const base64Data = tryOnImage.split(",")[1];
+      const byteString = atob(base64Data);
+      const bytes = new Uint8Array(byteString.length);
+      for (let i = 0; i < byteString.length; i++) bytes[i] = byteString.charCodeAt(i);
+      const blob = new Blob([bytes], { type: "image/png" });
+
+      const userId = selectedItems[0].user_id;
+      const path = `${userId}/${crypto.randomUUID()}-planner.png`;
+      const { error: uploadError } = await supabase.storage.from("tryon-images").upload(path, blob);
+      if (uploadError) throw uploadError;
+      const { data: urlData } = supabase.storage.from("tryon-images").getPublicUrl(path);
+
+      const weekStart = format(startOfWeek(new Date(), { weekStartsOn: 1 }), "yyyy-MM-dd");
+      await new Promise<void>((resolve, reject) => {
+        upsertPlan.mutate(
+          {
+            day_of_week: day,
+            week_start: weekStart,
+            item_ids: selectedItems.map((i) => i.id),
+            preview_image_url: urlData.publicUrl,
+          },
+          { onSuccess: () => resolve(), onError: (err) => reject(err) },
+        );
+      });
+      toast.success(`Outfit added to ${day}!`);
+      setPlannerDay(null);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to add to planner");
+    } finally {
+      setAddingToPlanner(false);
+    }
+  };
     if (!item.is_public) {
       togglePublic.mutate({ id: item.id, is_public: true }, {
         onSuccess: () => setShareDialogItem({ ...item, is_public: true }),
