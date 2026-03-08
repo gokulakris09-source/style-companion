@@ -5,7 +5,7 @@ import { DAYS } from "@/lib/types";
 import ClothingCard from "@/components/ClothingCard";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Sparkles, X, Plus, CalendarCheck, Loader2 } from "lucide-react";
+import { Sparkles, X, Plus, CalendarCheck, Loader2, Image as ImageIcon } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { startOfWeek, format } from "date-fns";
