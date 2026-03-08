@@ -136,6 +136,8 @@ export type OutfitHistoryRow = {
   worn_at: string;
   notes: string | null;
   ai_generated: boolean | null;
+  rating: number | null;
+  occasion: string | null;
   created_at: string;
 };
 
@@ -147,8 +149,7 @@ export function useOutfitHistory() {
       const { data, error } = await supabase
         .from("outfit_history")
         .select("*")
-        .order("worn_at", { ascending: false })
-        .limit(50);
+        .order("worn_at", { ascending: false });
       if (error) throw error;
       return data as OutfitHistoryRow[];
     },
@@ -160,7 +161,7 @@ export function useAddOutfitHistory() {
   const qc = useQueryClient();
   const { user } = useAuth();
   return useMutation({
-    mutationFn: async (entry: { item_ids: string[]; notes?: string; ai_generated?: boolean }) => {
+    mutationFn: async (entry: { item_ids: string[]; notes?: string; ai_generated?: boolean; occasion?: string }) => {
       const { data, error } = await supabase
         .from("outfit_history")
         .insert({ ...entry, user_id: user!.id })
@@ -173,6 +174,19 @@ export function useAddOutfitHistory() {
   });
 }
 
+export function useUpdateOutfitHistory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: { id: string; rating?: number; notes?: string; occasion?: string }) => {
+      const { error } = await supabase
+        .from("outfit_history")
+        .update(updates)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["outfit_history"] }),
+  });
+}
 // Image upload
 export function useUploadClothingImage() {
   const { user } = useAuth();
