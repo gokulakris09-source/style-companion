@@ -14,7 +14,150 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      clothing_items: {
+        Row: {
+          care_instructions: string | null
+          category: string
+          cleanliness: string
+          color: string
+          created_at: string
+          fabric: string
+          id: string
+          image_url: string | null
+          last_worn_at: string | null
+          name: string
+          occasion: string
+          season: string
+          updated_at: string
+          usage_count: number
+          user_id: string
+        }
+        Insert: {
+          care_instructions?: string | null
+          category: string
+          cleanliness?: string
+          color: string
+          created_at?: string
+          fabric: string
+          id?: string
+          image_url?: string | null
+          last_worn_at?: string | null
+          name: string
+          occasion: string
+          season: string
+          updated_at?: string
+          usage_count?: number
+          user_id: string
+        }
+        Update: {
+          care_instructions?: string | null
+          category?: string
+          cleanliness?: string
+          color?: string
+          created_at?: string
+          fabric?: string
+          id?: string
+          image_url?: string | null
+          last_worn_at?: string | null
+          name?: string
+          occasion?: string
+          season?: string
+          updated_at?: string
+          usage_count?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      outfit_history: {
+        Row: {
+          ai_generated: boolean | null
+          created_at: string
+          id: string
+          item_ids: string[]
+          notes: string | null
+          user_id: string
+          worn_at: string
+        }
+        Insert: {
+          ai_generated?: boolean | null
+          created_at?: string
+          id?: string
+          item_ids: string[]
+          notes?: string | null
+          user_id: string
+          worn_at?: string
+        }
+        Update: {
+          ai_generated?: boolean | null
+          created_at?: string
+          id?: string
+          item_ids?: string[]
+          notes?: string | null
+          user_id?: string
+          worn_at?: string
+        }
+        Relationships: []
+      }
+      outfit_plans: {
+        Row: {
+          created_at: string
+          day_of_week: string
+          id: string
+          item_ids: string[]
+          updated_at: string
+          user_id: string
+          week_start: string
+        }
+        Insert: {
+          created_at?: string
+          day_of_week: string
+          id?: string
+          item_ids?: string[]
+          updated_at?: string
+          user_id: string
+          week_start: string
+        }
+        Update: {
+          created_at?: string
+          day_of_week?: string
+          id?: string
+          item_ids?: string[]
+          updated_at?: string
+          user_id?: string
+          week_start?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          style_preferences: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          style_preferences?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          style_preferences?: Json | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
