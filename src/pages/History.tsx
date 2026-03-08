@@ -5,10 +5,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
-import { History as HistoryIcon, Star, BarChart3, PieChart, TrendingUp, TrendingDown } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart as RPieChart, Pie, Cell, Legend } from "recharts";
-import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, format, subWeeks, subMonths } from "date-fns";
+import { History as HistoryIcon, Star, BarChart3, PieChart, TrendingUp, TrendingDown, CalendarDays, Shirt } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart as RPieChart, Pie, Cell } from "recharts";
+import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, format, addDays } from "date-fns";
 import { toast } from "sonner";
+import { DAYS } from "@/lib/types";
 
 const CHART_COLORS = [
   "hsl(var(--primary))",
@@ -30,8 +31,9 @@ export default function History() {
   const getItem = (id: string) => items.find((i) => i.id === id);
   const getItemName = (id: string) => getItem(id)?.name || "Unknown";
 
-  // Filter history by time period
   const now = new Date();
+  const weekStartDate = startOfWeek(now, { weekStartsOn: 1 });
+
   const filteredHistory = useMemo(() => {
     const interval = timePeriod === "week"
       ? { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }) }
@@ -39,20 +41,33 @@ export default function History() {
     return history.filter((h) => isWithinInterval(new Date(h.worn_at), interval));
   }, [history, timePeriod]);
 
+  // Weekly view: map each day to its history entry
+  const weeklyOutfits = useMemo(() => {
+    const map: Record<string, OutfitHistoryRow[]> = {};
+    DAYS.forEach((day) => { map[day] = []; });
+    filteredHistory.forEach((h) => {
+      // Match by day_of_week field or by worn_at date
+      if (h.day_of_week && DAYS.includes(h.day_of_week)) {
+        map[h.day_of_week].push(h);
+      } else {
+        const dayName = format(new Date(h.worn_at), "EEEE");
+        if (map[dayName]) map[dayName].push(h);
+      }
+    });
+    return map;
+  }, [filteredHistory]);
+
   // Item usage frequency
   const itemUsageData = useMemo(() => {
     const counts: Record<string, number> = {};
     filteredHistory.forEach((h) => {
-      h.item_ids.forEach((id) => {
-        counts[id] = (counts[id] || 0) + 1;
-      });
+      h.item_ids.forEach((id) => { counts[id] = (counts[id] || 0) + 1; });
     });
     return Object.entries(counts)
       .map(([id, count]) => ({ id, name: getItemName(id), count, category: getItem(id)?.category || "unknown" }))
       .sort((a, b) => b.count - a.count);
   }, [filteredHistory, items]);
 
-  // Category distribution
   const categoryData = useMemo(() => {
     const counts: Record<string, number> = {};
     filteredHistory.forEach((h) => {
@@ -64,7 +79,6 @@ export default function History() {
     return Object.entries(counts).map(([name, value]) => ({ name: name.charAt(0).toUpperCase() + name.slice(1), value }));
   }, [filteredHistory, items]);
 
-  // Daily usage for bar chart
   const dailyData = useMemo(() => {
     const days: Record<string, number> = {};
     filteredHistory.forEach((h) => {
@@ -74,15 +88,12 @@ export default function History() {
     return Object.entries(days).map(([day, outfits]) => ({ day, outfits }));
   }, [filteredHistory, timePeriod]);
 
-  // Most & least worn
   const mostWorn = itemUsageData.slice(0, 5);
   const leastWorn = useMemo(() => {
     const wornIds = new Set(filteredHistory.flatMap((h) => h.item_ids));
-    const neverWorn = items.filter((i) => !wornIds.has(i.id));
-    return neverWorn.slice(0, 5);
+    return items.filter((i) => !wornIds.has(i.id)).slice(0, 5);
   }, [filteredHistory, items]);
 
-  // Average rating
   const avgRating = useMemo(() => {
     const rated = filteredHistory.filter((h) => h.rating != null);
     if (rated.length === 0) return null;
@@ -90,9 +101,7 @@ export default function History() {
   }, [filteredHistory]);
 
   const handleRate = (id: string, rating: number) => {
-    updateHistory.mutate({ id, rating }, {
-      onSuccess: () => toast.success(`Rated ${rating} stars`),
-    });
+    updateHistory.mutate({ id, rating }, { onSuccess: () => toast.success(`Rated ${rating} stars`) });
   };
 
   const periodLabel = timePeriod === "week"
@@ -127,11 +136,94 @@ export default function History() {
         <SummaryCard label="Unused Items" value={leastWorn.length.toString()} sub="not worn this period" />
       </div>
 
-      <Tabs defaultValue="analytics">
+      <Tabs defaultValue="weekly">
         <TabsList>
+          <TabsTrigger value="weekly">Weekly View</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
           <TabsTrigger value="timeline">Timeline ({history.length})</TabsTrigger>
         </TabsList>
+
+        {/* ── Weekly Visual View ── */}
+        <TabsContent value="weekly" className="mt-4">
+          {timePeriod !== "week" ? (
+            <div className="text-center py-12">
+              <CalendarDays className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+              <p className="text-muted-foreground">Switch to "This Week" to see the weekly outfit view.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
+              {DAYS.map((day, i) => {
+                const entries = weeklyOutfits[day] || [];
+                const dateStr = format(addDays(weekStartDate, i), "MMM d");
+                const latestEntry = entries[0]; // most recent entry for this day
+                return (
+                  <motion.div
+                    key={day}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                    className="bg-card border rounded-xl overflow-hidden"
+                  >
+                    <div className="px-3 py-2 border-b bg-muted/30">
+                      <p className="font-display font-semibold text-sm">{day.slice(0, 3)}</p>
+                      <p className="text-[10px] text-muted-foreground">{dateStr}</p>
+                    </div>
+                    {latestEntry ? (
+                      <div className="p-2 space-y-2">
+                        {/* Outfit preview image */}
+                        {latestEntry.image_url ? (
+                          <div className="aspect-[3/4] rounded-lg overflow-hidden bg-secondary">
+                            <img src={latestEntry.image_url} alt={`${day} outfit`} className="w-full h-full object-cover" />
+                          </div>
+                        ) : (
+                          /* Show item thumbnails grid if no outfit image */
+                          <div className="aspect-[3/4] rounded-lg bg-secondary p-1.5 grid grid-cols-2 gap-1">
+                            {latestEntry.item_ids.slice(0, 4).map((id) => {
+                              const item = getItem(id);
+                              return (
+                                <div key={id} className="rounded overflow-hidden bg-muted">
+                                  {item?.image_url ? (
+                                    <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-lg">
+                                      {item?.category === "top" ? "👔" : item?.category === "bottom" ? "👖" : item?.category === "dress" ? "👗" : item?.category === "footwear" ? "👟" : item?.category === "outerwear" ? "🧥" : "💍"}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                        {/* Item names */}
+                        <div className="space-y-0.5">
+                          {latestEntry.item_ids.slice(0, 3).map((id) => (
+                            <p key={id} className="text-[10px] text-muted-foreground truncate">{getItemName(id)}</p>
+                          ))}
+                          {latestEntry.item_ids.length > 3 && (
+                            <p className="text-[10px] text-muted-foreground">+{latestEntry.item_ids.length - 3} more</p>
+                          )}
+                        </div>
+                        {/* Rating */}
+                        <div className="flex gap-0.5">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <button key={star} onClick={() => handleRate(latestEntry.id, star)} className="p-0">
+                              <Star className={`h-3 w-3 ${latestEntry.rating != null && star <= latestEntry.rating ? "fill-accent text-accent" : "text-muted-foreground/20"}`} />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="aspect-[3/4] flex flex-col items-center justify-center text-muted-foreground/40 p-2">
+                        <Shirt className="h-8 w-8 mb-1" />
+                        <p className="text-[10px]">No outfit</p>
+                      </div>
+                    )}
+                  </motion.div>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
 
         {/* ── Analytics Tab ── */}
         <TabsContent value="analytics" className="space-y-6 mt-4">
@@ -143,7 +235,6 @@ export default function History() {
             </div>
           ) : (
             <>
-              {/* Outfits per day bar chart */}
               <div className="bg-card border rounded-xl p-6">
                 <h2 className="font-display font-semibold mb-4">Outfits Per Day</h2>
                 <div className="h-64">
@@ -160,7 +251,6 @@ export default function History() {
               </div>
 
               <div className="grid md:grid-cols-2 gap-4">
-                {/* Most worn items bar chart */}
                 <div className="bg-card border rounded-xl p-6">
                   <h2 className="font-display font-semibold mb-4 flex items-center gap-2">
                     <TrendingUp className="h-4 w-4 text-accent" /> Most Worn Items
@@ -182,7 +272,6 @@ export default function History() {
                   )}
                 </div>
 
-                {/* Category pie chart */}
                 <div className="bg-card border rounded-xl p-6">
                   <h2 className="font-display font-semibold mb-4 flex items-center gap-2">
                     <PieChart className="h-4 w-4 text-accent" /> Category Distribution
@@ -206,7 +295,6 @@ export default function History() {
                 </div>
               </div>
 
-              {/* Least worn / unused items */}
               {leastWorn.length > 0 && (
                 <div className="bg-card border rounded-xl p-6">
                   <h2 className="font-display font-semibold mb-3 flex items-center gap-2">
@@ -233,45 +321,52 @@ export default function History() {
             <div className="text-center py-16">
               <HistoryIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <p className="font-display text-lg text-muted-foreground">No outfit history yet</p>
-              <p className="text-sm text-muted-foreground mt-1">Wear outfits from Suggestions to build your history.</p>
+              <p className="text-sm text-muted-foreground mt-1">Confirm outfits from your Weekly Planner to build history.</p>
             </div>
           ) : (
             <div className="space-y-4">
               {history.map((entry, i) => (
                 <motion.div key={entry.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }} className="bg-card border rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">
-                        {new Date(entry.worn_at).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
-                      </span>
-                      {entry.ai_generated && <span className="text-xs bg-accent/10 text-accent px-2 py-0.5 rounded-full">AI Suggested</span>}
-                      {entry.occasion && <Badge variant="outline" className="text-[10px] py-0">{entry.occasion}</Badge>}
-                    </div>
-                    {/* Star rating */}
-                    <div className="flex items-center gap-0.5">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <button
-                          key={star}
-                          onClick={() => handleRate(entry.id, star)}
-                          className="p-0.5 transition-colors"
-                        >
-                          <Star
-                            className={`h-4 w-4 ${
-                              entry.rating != null && star <= entry.rating
-                                ? "fill-accent text-accent"
-                                : "text-muted-foreground/30 hover:text-accent/50"
-                            }`}
-                          />
-                        </button>
-                      ))}
+                  <div className="flex items-start gap-4">
+                    {/* Outfit image thumbnail */}
+                    {entry.image_url && (
+                      <div className="w-20 h-24 rounded-lg overflow-hidden bg-secondary shrink-0 shadow-sm">
+                        <img src={entry.image_url} alt="Outfit" className="w-full h-full object-cover" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-medium">
+                            {new Date(entry.worn_at).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
+                          </span>
+                          {entry.ai_generated && <span className="text-xs bg-accent/10 text-accent px-2 py-0.5 rounded-full">AI Suggested</span>}
+                          {entry.occasion && <Badge variant="outline" className="text-[10px] py-0">{entry.occasion}</Badge>}
+                        </div>
+                        <div className="flex items-center gap-0.5">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <button key={star} onClick={() => handleRate(entry.id, star)} className="p-0.5 transition-colors">
+                              <Star className={`h-4 w-4 ${entry.rating != null && star <= entry.rating ? "fill-accent text-accent" : "text-muted-foreground/30 hover:text-accent/50"}`} />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex gap-2 flex-wrap">
+                        {entry.item_ids.map((id) => {
+                          const item = getItem(id);
+                          return (
+                            <div key={id} className="flex items-center gap-1.5 bg-secondary rounded-lg px-2 py-1">
+                              {item?.image_url ? (
+                                <img src={item.image_url} alt={item.name} className="w-5 h-5 rounded object-cover" />
+                              ) : null}
+                              <span className="text-xs">{getItemName(id)}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {entry.notes && <p className="text-xs text-muted-foreground mt-2">{entry.notes}</p>}
                     </div>
                   </div>
-                  <div className="flex gap-2 flex-wrap">
-                    {entry.item_ids.map((id) => (
-                      <span key={id} className="bg-secondary rounded-lg px-3 py-1.5 text-sm">{getItemName(id)}</span>
-                    ))}
-                  </div>
-                  {entry.notes && <p className="text-xs text-muted-foreground mt-2">{entry.notes}</p>}
                 </motion.div>
               ))}
             </div>
