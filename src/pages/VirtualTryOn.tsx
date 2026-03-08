@@ -285,7 +285,43 @@ export default function VirtualTryOn() {
     }
   };
 
-  const handleShare = (item: GalleryItem) => {
+  const handleAddToPlanner = async (day: string) => {
+    if (!tryOnImage || selectedItems.length === 0) return;
+    setAddingToPlanner(true);
+    try {
+      // Upload the try-on image to storage for the planner preview
+      const base64Data = tryOnImage.split(",")[1];
+      const byteString = atob(base64Data);
+      const bytes = new Uint8Array(byteString.length);
+      for (let i = 0; i < byteString.length; i++) bytes[i] = byteString.charCodeAt(i);
+      const blob = new Blob([bytes], { type: "image/png" });
+
+      const { user } = useAuth as any; // we already have user from hook
+      const path = `${selectedItems[0].user_id}/${crypto.randomUUID()}-planner.png`;
+      const { error: uploadError } = await supabase.storage.from("tryon-images").upload(path, blob);
+      if (uploadError) throw uploadError;
+      const { data: urlData } = supabase.storage.from("tryon-images").getPublicUrl(path);
+
+      const weekStart = format(startOfWeek(new Date(), { weekStartsOn: 1 }), "yyyy-MM-dd");
+      await new Promise<void>((resolve, reject) => {
+        upsertPlan.mutate(
+          {
+            day_of_week: day,
+            week_start: weekStart,
+            item_ids: selectedItems.map((i) => i.id),
+            preview_image_url: urlData.publicUrl,
+          },
+          { onSuccess: () => resolve(), onError: (err) => reject(err) },
+        );
+      });
+      toast.success(`Outfit added to ${day}!`);
+      setPlannerDay(null);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to add to planner");
+    } finally {
+      setAddingToPlanner(false);
+    }
+  };
     if (!item.is_public) {
       togglePublic.mutate({ id: item.id, is_public: true }, {
         onSuccess: () => setShareDialogItem({ ...item, is_public: true }),
