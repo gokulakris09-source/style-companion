@@ -190,6 +190,29 @@ export default function Planner() {
     toast.success("Week cleared");
   };
 
+  const confirmWorn = (day: string) => {
+    const plan = plans.find((p) => p.day_of_week === day);
+    if (!plan || plan.item_ids.length === 0) { toast.error("No outfit to confirm"); return; }
+    // Calculate the actual date for this day of the week
+    const weekStartDate = new Date(weekStart + "T00:00:00");
+    const dayIndex = DAYS.indexOf(day);
+    const wornDate = new Date(weekStartDate);
+    wornDate.setDate(wornDate.getDate() + dayIndex);
+
+    addHistory.mutate({
+      item_ids: plan.item_ids,
+      image_url: plan.preview_image_url || undefined,
+      day_of_week: day,
+      worn_at: wornDate.toISOString(),
+    }, {
+      onSuccess: () => {
+        setConfirmedDays((prev) => new Set([...prev, day]));
+        toast.success(`${day}'s outfit saved to history!`);
+      },
+      onError: (err) => toast.error(err.message),
+    });
+  };
+
   const availableItems = items.filter((i) => i.cleanliness !== "dirty");
   const hasAnyPlans = plans.some((p) => p.item_ids.length > 0);
 
