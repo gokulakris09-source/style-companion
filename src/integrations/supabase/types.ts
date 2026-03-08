@@ -158,6 +158,42 @@ export type Database = {
         }
         Relationships: []
       }
+      tryon_gallery: {
+        Row: {
+          background: string | null
+          created_at: string
+          description: string | null
+          id: string
+          image_url: string
+          is_public: boolean
+          item_names: string[]
+          style: string | null
+          user_id: string
+        }
+        Insert: {
+          background?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url: string
+          is_public?: boolean
+          item_names?: string[]
+          style?: string | null
+          user_id: string
+        }
+        Update: {
+          background?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string
+          is_public?: boolean
+          item_names?: string[]
+          style?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
