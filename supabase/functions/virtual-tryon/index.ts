@@ -9,15 +9,37 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { items } = await req.json();
+    const { items, style, background } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const outfitDescription = items.map((item: any) =>
-      `${item.color} ${item.fabric} ${item.name} (${item.category})`
-    ).join(", ");
+    if (!items || items.length === 0) {
+      return new Response(JSON.stringify({ error: "No items provided" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-    const prompt = `Generate a beautiful fashion illustration showing this outfit combination worn by a stylish model: ${outfitDescription}. The image should be a clean, editorial fashion illustration with a minimalist background. Show the complete outfit on a figure in a natural pose.`;
+    const outfitDescription = items
+      .map((item: any) => `${item.color} ${item.fabric} ${item.name} (${item.category})`)
+      .join(", ");
+
+    const styleHint = style || "modern editorial";
+    const bgHint = background || "clean studio with soft lighting";
+
+    const prompt = `Create a highly realistic, full-body fashion photograph of a stylish model wearing the following outfit: ${outfitDescription}.
+
+Style direction: ${styleHint}
+Background: ${bgHint}
+
+Important requirements:
+- Photorealistic quality, like a professional lookbook or fashion magazine editorial
+- Show the complete outfit from head to toe on a single model in a natural, confident pose
+- Accurate fabric textures: show how the materials drape, fold, and reflect light realistically
+- Correct color representation for each garment
+- Professional studio lighting with soft shadows
+- The outfit should look cohesive and styled together as one complete look
+- No text, watermarks, or logos in the image`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -26,7 +48,7 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image",
+        model: "google/gemini-3-pro-image-preview",
         messages: [{ role: "user", content: prompt }],
         modalities: ["image", "text"],
       }),
@@ -34,31 +56,38 @@ serve(async (req) => {
 
     if (!response.ok) {
       if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded, please try again later." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }), {
+          status: 429,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        return new Response(JSON.stringify({ error: "AI credits exhausted. Please add credits to continue." }), {
+          status: 402,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       const text = await response.text();
       console.error("AI gateway error:", response.status, text);
-      throw new Error("AI gateway error");
+      throw new Error("AI image generation failed");
     }
 
     const data = await response.json();
     const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url || null;
-    const text = data.choices?.[0]?.message?.content || "";
+    const description = data.choices?.[0]?.message?.content || "";
 
-    return new Response(JSON.stringify({ imageUrl, text }), {
+    if (!imageUrl) {
+      throw new Error("No image was generated");
+    }
+
+    return new Response(JSON.stringify({ imageUrl, description }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
     console.error("virtual-tryon error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
