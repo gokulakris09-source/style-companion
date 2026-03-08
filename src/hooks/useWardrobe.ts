@@ -88,6 +88,7 @@ export type OutfitPlanRow = {
   day_of_week: string;
   week_start: string;
   item_ids: string[];
+  preview_image_url: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -112,13 +113,22 @@ export function useUpsertOutfitPlan() {
   const qc = useQueryClient();
   const { user } = useAuth();
   return useMutation({
-    mutationFn: async ({ day_of_week, week_start, item_ids }: { day_of_week: string; week_start: string; item_ids: string[] }) => {
+    mutationFn: async ({
+      day_of_week,
+      week_start,
+      item_ids,
+      preview_image_url,
+    }: {
+      day_of_week: string;
+      week_start: string;
+      item_ids: string[];
+      preview_image_url?: string | null;
+    }) => {
+      const payload: any = { user_id: user!.id, day_of_week, week_start, item_ids };
+      if (preview_image_url !== undefined) payload.preview_image_url = preview_image_url;
       const { data, error } = await supabase
         .from("outfit_plans")
-        .upsert(
-          { user_id: user!.id, day_of_week, week_start, item_ids },
-          { onConflict: "user_id,day_of_week,week_start" }
-        )
+        .upsert(payload, { onConflict: "user_id,day_of_week,week_start" })
         .select()
         .single();
       if (error) throw error;
@@ -127,7 +137,6 @@ export function useUpsertOutfitPlan() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["outfit_plans"] }),
   });
 }
-
 // Outfit history
 export type OutfitHistoryRow = {
   id: string;
