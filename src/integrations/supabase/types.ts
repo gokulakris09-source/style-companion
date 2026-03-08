@@ -75,6 +75,8 @@ export type Database = {
           id: string
           item_ids: string[]
           notes: string | null
+          occasion: string | null
+          rating: number | null
           user_id: string
           worn_at: string
         }
@@ -84,6 +86,8 @@ export type Database = {
           id?: string
           item_ids: string[]
           notes?: string | null
+          occasion?: string | null
+          rating?: number | null
           user_id: string
           worn_at?: string
         }
@@ -93,6 +97,8 @@ export type Database = {
           id?: string
           item_ids?: string[]
           notes?: string | null
+          occasion?: string | null
+          rating?: number | null
           user_id?: string
           worn_at?: string
         }
