@@ -156,6 +156,7 @@ export default function VirtualTryOn() {
   const togglePublic = useTogglePublic();
   const deleteGalleryItem = useDeleteGalleryItem();
   const uploadPhoto = useUploadUserPhoto();
+  const upsertPlan = useUpsertOutfitPlan();
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [style, setStyle] = useState("modern editorial");
