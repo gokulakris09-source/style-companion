@@ -296,8 +296,8 @@ export default function VirtualTryOn() {
       for (let i = 0; i < byteString.length; i++) bytes[i] = byteString.charCodeAt(i);
       const blob = new Blob([bytes], { type: "image/png" });
 
-      const { user } = useAuth as any; // we already have user from hook
-      const path = `${selectedItems[0].user_id}/${crypto.randomUUID()}-planner.png`;
+      const userId = selectedItems[0].user_id;
+      const path = `${userId}/${crypto.randomUUID()}-planner.png`;
       const { error: uploadError } = await supabase.storage.from("tryon-images").upload(path, blob);
       if (uploadError) throw uploadError;
       const { data: urlData } = supabase.storage.from("tryon-images").getPublicUrl(path);
