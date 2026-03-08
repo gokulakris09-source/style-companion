@@ -105,8 +105,11 @@ export default function Planner() {
   const { data: items = [] } = useClothingItems();
   const { data: plans = [] } = useOutfitPlans(weekStart);
   const upsertPlan = useUpsertOutfitPlan();
+  const addHistory = useAddOutfitHistory();
+  const { user } = useAuth();
   const [pickingDay, setPickingDay] = useState<string | null>(null);
   const [autoFilling, setAutoFilling] = useState(false);
+  const [confirmedDays, setConfirmedDays] = useState<Set<string>>(new Set());
 
   const getDayItemIds = (day: string): string[] => {
     const plan = plans.find((p) => p.day_of_week === day);
