@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useClothingItems, ClothingItemRow } from "@/hooks/useWardrobe";
 import { useAuth } from "@/contexts/AuthContext";
@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import {
   Image as ImageIcon, Loader2, X, Shirt, RotateCcw,
   Heart, Share2, Trash2, Globe, Lock, Copy, Check,
+  Camera, Upload, UserCircle,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -79,7 +80,6 @@ function useSaveToGallery() {
       background: string;
       description: string;
     }) => {
-      // Upload base64 to storage
       const base64Data = base64Image.split(",")[1];
       const byteString = atob(base64Data);
       const bytes = new Uint8Array(byteString.length);
@@ -115,10 +115,7 @@ function useTogglePublic() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, is_public }: { id: string; is_public: boolean }) => {
-      const { error } = await supabase
-        .from("tryon_gallery")
-        .update({ is_public })
-        .eq("id", id);
+      const { error } = await supabase.from("tryon_gallery").update({ is_public }).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["tryon_gallery"] }),
@@ -136,12 +133,28 @@ function useDeleteGalleryItem() {
   });
 }
 
+/** Upload user photo to storage and return public URL */
+function useUploadUserPhoto() {
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const ext = file.name.split(".").pop() || "jpg";
+      const path = `${user!.id}/user-photo-${crypto.randomUUID()}.${ext}`;
+      const { error } = await supabase.storage.from("tryon-images").upload(path, file);
+      if (error) throw error;
+      const { data } = supabase.storage.from("tryon-images").getPublicUrl(path);
+      return data.publicUrl;
+    },
+  });
+}
+
 export default function VirtualTryOn() {
   const { data: items = [] } = useClothingItems();
   const { data: gallery = [] } = useGallery();
   const saveToGallery = useSaveToGallery();
   const togglePublic = useTogglePublic();
   const deleteGalleryItem = useDeleteGalleryItem();
+  const uploadPhoto = useUploadUserPhoto();
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [style, setStyle] = useState("modern editorial");
@@ -153,6 +166,12 @@ export default function VirtualTryOn() {
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [shareDialogItem, setShareDialogItem] = useState<GalleryItem | null>(null);
   const [copied, setCopied] = useState(false);
+
+  // User photo state
+  const [userPhotoUrl, setUserPhotoUrl] = useState<string | null>(null);
+  const [userPhotoPreview, setUserPhotoPreview] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const selectedItems = items.filter((i) => selectedIds.has(i.id));
 
@@ -175,6 +194,43 @@ export default function VirtualTryOn() {
     ? items
     : items.filter((i) => i.category === filterCategory);
 
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please upload an image file");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Image must be under 10MB");
+      return;
+    }
+
+    // Show local preview immediately
+    const reader = new FileReader();
+    reader.onload = (ev) => setUserPhotoPreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
+
+    // Upload to storage
+    setUploadingPhoto(true);
+    try {
+      const url = await uploadPhoto.mutateAsync(file);
+      setUserPhotoUrl(url);
+      toast.success("Photo uploaded! It will be used for try-on generation.");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to upload photo");
+      setUserPhotoPreview(null);
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const removePhoto = () => {
+    setUserPhotoUrl(null);
+    setUserPhotoPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   const generateTryOn = async () => {
     if (selectedItems.length === 0) {
       toast.error("Select at least one item to try on");
@@ -191,13 +247,14 @@ export default function VirtualTryOn() {
           })),
           style,
           background,
+          userPhotoUrl: userPhotoUrl || undefined,
         },
       });
       if (error) throw error;
       if (data.error) { toast.error(data.error); return; }
       setTryOnImage(data.imageUrl);
       setDescription(data.description || "");
-      toast.success("Try-on visualization generated!");
+      toast.success(userPhotoUrl ? "Try-on with your photo generated!" : "Try-on visualization generated!");
     } catch (err: any) {
       toast.error(err.message || "Virtual try-on failed");
     } finally {
@@ -227,9 +284,7 @@ export default function VirtualTryOn() {
   const handleShare = (item: GalleryItem) => {
     if (!item.is_public) {
       togglePublic.mutate({ id: item.id, is_public: true }, {
-        onSuccess: () => {
-          setShareDialogItem({ ...item, is_public: true });
-        },
+        onSuccess: () => setShareDialogItem({ ...item, is_public: true }),
       });
     } else {
       setShareDialogItem(item);
@@ -247,14 +302,12 @@ export default function VirtualTryOn() {
   const handleTogglePublic = (item: GalleryItem) => {
     togglePublic.mutate(
       { id: item.id, is_public: !item.is_public },
-      { onSuccess: () => toast.success(item.is_public ? "Made private" : "Made public") }
+      { onSuccess: () => toast.success(item.is_public ? "Made private" : "Made public") },
     );
   };
 
   const handleDelete = (id: string) => {
-    deleteGalleryItem.mutate(id, {
-      onSuccess: () => toast.success("Removed from gallery"),
-    });
+    deleteGalleryItem.mutate(id, { onSuccess: () => toast.success("Removed from gallery") });
   };
 
   return (
@@ -262,7 +315,7 @@ export default function VirtualTryOn() {
       <div>
         <h1 className="text-3xl font-display font-semibold tracking-tight">Virtual Try-On</h1>
         <p className="text-muted-foreground mt-1">
-          Select items, generate outfit visualizations, and save your favorites.
+          Upload your photo, select clothing items, and see how the outfit looks on you.
         </p>
       </div>
 
@@ -274,30 +327,101 @@ export default function VirtualTryOn() {
 
         {/* ── Create Tab ── */}
         <TabsContent value="create" className="space-y-6 mt-4">
-          {/* Selected items bar */}
-          <div className="bg-card border rounded-xl p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="font-display font-semibold text-sm">
-                Selected Items ({selectedItems.length})
-              </h2>
-              {selectedItems.length > 0 && (
-                <Button variant="ghost" size="sm" onClick={clearSelection} className="text-xs text-muted-foreground gap-1">
-                  <RotateCcw className="h-3 w-3" /> Clear
+
+          {/* Photo upload + Selected items row */}
+          <div className="grid md:grid-cols-[240px_1fr] gap-4">
+            {/* User photo card */}
+            <div className="bg-card border rounded-xl p-4 flex flex-col items-center">
+              <h2 className="font-display font-semibold text-sm mb-3 self-start">Your Photo</h2>
+              {userPhotoPreview ? (
+                <div className="relative w-full">
+                  <img
+                    src={userPhotoPreview}
+                    alt="Your photo"
+                    className="w-full aspect-[3/4] object-cover rounded-lg"
+                  />
+                  {uploadingPhoto && (
+                    <div className="absolute inset-0 bg-background/60 rounded-lg flex items-center justify-center">
+                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    </div>
+                  )}
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    className="absolute top-2 right-2 h-7 w-7"
+                    onClick={removePhoto}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full aspect-[3/4] border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-primary/50 hover:text-foreground transition-colors cursor-pointer"
+                >
+                  <UserCircle className="h-10 w-10" />
+                  <span className="text-xs font-medium">Upload your photo</span>
+                  <span className="text-[10px]">for personalized try-on</span>
+                </button>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handlePhotoUpload}
+              />
+              {!userPhotoPreview && (
+                <p className="text-[10px] text-muted-foreground mt-2 text-center">
+                  Optional — without a photo, we'll use a fashion model
+                </p>
+              )}
+              {userPhotoPreview && !uploadingPhoto && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="mt-2 text-xs gap-1"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Camera className="h-3 w-3" /> Change photo
                 </Button>
               )}
             </div>
-            {selectedItems.length === 0 ? (
-              <p className="text-sm text-muted-foreground italic">Click items below to add them to your try-on outfit</p>
-            ) : (
-              <div className="flex gap-2 flex-wrap">
-                {selectedItems.map((item) => (
-                  <Badge key={item.id} variant="secondary" className="gap-1.5 py-1.5 px-3 cursor-pointer hover:bg-destructive/10 transition-colors" onClick={() => toggleItem(item.id)}>
-                    {item.name}
-                    <X className="h-3 w-3" />
-                  </Badge>
-                ))}
+
+            {/* Selected items bar */}
+            <div className="bg-card border rounded-xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="font-display font-semibold text-sm">
+                  Selected Items ({selectedItems.length})
+                </h2>
+                {selectedItems.length > 0 && (
+                  <Button variant="ghost" size="sm" onClick={clearSelection} className="text-xs text-muted-foreground gap-1">
+                    <RotateCcw className="h-3 w-3" /> Clear
+                  </Button>
+                )}
               </div>
-            )}
+              {selectedItems.length === 0 ? (
+                <p className="text-sm text-muted-foreground italic">Click items below to add them to your try-on outfit</p>
+              ) : (
+                <div className="flex gap-2 flex-wrap">
+                  {selectedItems.map((item) => (
+                    <Badge key={item.id} variant="secondary" className="gap-1.5 py-1.5 px-3 cursor-pointer hover:bg-destructive/10 transition-colors" onClick={() => toggleItem(item.id)}>
+                      {item.name}
+                      <X className="h-3 w-3" />
+                    </Badge>
+                  ))}
+                </div>
+              )}
+
+              {/* Inline info */}
+              <div className="mt-4 p-3 bg-muted/50 rounded-lg">
+                <p className="text-xs text-muted-foreground">
+                  {userPhotoUrl
+                    ? "✨ Your photo will be used — the AI will dress you in the selected clothes, matching your body shape and pose."
+                    : "💡 Upload your photo on the left to see clothes on yourself, or generate with a fashion model."}
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* Controls */}
@@ -323,7 +447,7 @@ export default function VirtualTryOn() {
             <div className="flex items-end gap-2">
               <Button onClick={generateTryOn} disabled={loading || selectedItems.length === 0} className="gap-2">
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
-                {loading ? "Generating..." : "Generate Try-On"}
+                {loading ? "Generating..." : userPhotoUrl ? "Try On Me" : "Generate Try-On"}
               </Button>
             </div>
           </div>
@@ -333,7 +457,9 @@ export default function VirtualTryOn() {
             {tryOnImage && (
               <motion.div key="tryon-result" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 16 }} className="bg-card border rounded-xl p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="font-display text-lg font-semibold">Your Virtual Outfit</h2>
+                  <h2 className="font-display text-lg font-semibold">
+                    {userPhotoUrl ? "You in This Outfit" : "Your Virtual Outfit"}
+                  </h2>
                   <Button onClick={handleSaveToGallery} disabled={saving} variant="outline" size="sm" className="gap-2">
                     {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Heart className="h-4 w-4" />}
                     {saving ? "Saving..." : "Save to Gallery"}
@@ -407,13 +533,7 @@ export default function VirtualTryOn() {
                   <div className="relative">
                     <img src={item.image_url} alt="Saved try-on" className="w-full aspect-[3/4] object-cover" />
                     <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button
-                        size="icon"
-                        variant="secondary"
-                        className="h-8 w-8"
-                        onClick={() => handleTogglePublic(item)}
-                        title={item.is_public ? "Make private" : "Make public"}
-                      >
+                      <Button size="icon" variant="secondary" className="h-8 w-8" onClick={() => handleTogglePublic(item)} title={item.is_public ? "Make private" : "Make public"}>
                         {item.is_public ? <Globe className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
                       </Button>
                       <Button size="icon" variant="secondary" className="h-8 w-8" onClick={() => handleShare(item)} title="Share">
@@ -457,11 +577,7 @@ export default function VirtualTryOn() {
             <div className="space-y-4">
               <img src={shareDialogItem.image_url} alt="Shared try-on" className="w-full rounded-lg" />
               <div className="flex gap-2">
-                <input
-                  readOnly
-                  value={shareDialogItem.image_url}
-                  className="flex-1 bg-secondary rounded-lg px-3 py-2 text-xs truncate"
-                />
+                <input readOnly value={shareDialogItem.image_url} className="flex-1 bg-secondary rounded-lg px-3 py-2 text-xs truncate" />
                 <Button size="sm" onClick={copyShareLink} className="gap-1.5">
                   {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                   {copied ? "Copied" : "Copy"}

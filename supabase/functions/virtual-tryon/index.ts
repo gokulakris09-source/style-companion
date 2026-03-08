@@ -9,7 +9,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { items, style, background } = await req.json();
+    const { items, style, background, userPhotoUrl } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
@@ -27,7 +27,46 @@ serve(async (req) => {
     const styleHint = style || "modern editorial";
     const bgHint = background || "clean studio with soft lighting";
 
-    const prompt = `Create a highly realistic, full-body fashion photograph of a stylish model wearing the following outfit: ${outfitDescription}.
+    // Build messages based on whether user photo is provided
+    let messages: any[];
+
+    if (userPhotoUrl) {
+      // Photo-based try-on: overlay clothing onto user's photo
+      messages = [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `You are a virtual try-on AI. Look at this person's photo carefully — note their body shape, pose, skin tone, and proportions.
+
+Now dress this EXACT person in the following outfit: ${outfitDescription}
+
+Style direction: ${styleHint}
+Background: ${bgHint}
+
+Critical requirements:
+- Keep the person's face, body shape, pose, and proportions EXACTLY as in the photo
+- Replace/overlay their current clothing with the specified outfit items
+- Ensure the clothing fits naturally on their body — proper draping, wrinkles, and shadows
+- Maintain realistic fabric textures and accurate colors for each garment
+- The result must look like a real photograph of this person wearing these clothes
+- Preserve natural lighting consistent with the background setting
+- No text, watermarks, or logos`,
+            },
+            {
+              type: "image_url",
+              image_url: { url: userPhotoUrl },
+            },
+          ],
+        },
+      ];
+    } else {
+      // Generic model try-on (no user photo)
+      messages = [
+        {
+          role: "user",
+          content: `Create a highly realistic, full-body fashion photograph of a stylish model wearing the following outfit: ${outfitDescription}.
 
 Style direction: ${styleHint}
 Background: ${bgHint}
@@ -39,7 +78,10 @@ Important requirements:
 - Correct color representation for each garment
 - Professional studio lighting with soft shadows
 - The outfit should look cohesive and styled together as one complete look
-- No text, watermarks, or logos in the image`;
+- No text, watermarks, or logos in the image`,
+        },
+      ];
+    }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -49,7 +91,7 @@ Important requirements:
       },
       body: JSON.stringify({
         model: "google/gemini-3-pro-image-preview",
-        messages: [{ role: "user", content: prompt }],
+        messages,
         modalities: ["image", "text"],
       }),
     });
