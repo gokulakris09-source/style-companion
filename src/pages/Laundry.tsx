@@ -1,6 +1,5 @@
 import { useMemo } from "react";
 import { useClothingItems, useUpdateClothingItem, ClothingItemRow } from "@/hooks/useWardrobe";
-import ClothingCard from "@/components/ClothingCard";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
@@ -58,14 +57,27 @@ export default function Laundry() {
         ))}
       </div>
 
-      <div className="space-y-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
         {filtered.map((item, i) => (
-          <motion.div key={item.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }} className="bg-card border rounded-lg p-4 flex items-center gap-4">
-            <div className="flex-1"><ClothingCard item={item} compact /></div>
-            <div className="flex gap-2 shrink-0">
-              {item.cleanliness !== "clean" && <Button size="sm" variant="outline" onClick={() => markAs(item.id, "clean")} className="text-xs">Clean</Button>}
-              {item.cleanliness === "clean" && <Button size="sm" variant="outline" onClick={() => markAs(item.id, "worn")} className="text-xs">Worn</Button>}
-              {item.cleanliness !== "dirty" && <Button size="sm" variant="outline" onClick={() => markAs(item.id, "dirty")} className="text-xs text-destructive border-destructive/30">Wash</Button>}
+          <motion.div key={item.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }} className="bg-card border rounded-lg overflow-hidden">
+            <div className="aspect-[3/4] bg-secondary flex items-center justify-center text-muted-foreground relative overflow-hidden">
+              {item.image_url ? (
+                <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
+              ) : (
+                <div className="flex flex-col items-center gap-2 text-3xl">
+                  {item.category === "top" ? "👔" : item.category === "bottom" ? "👖" : item.category === "dress" ? "👗" : item.category === "footwear" ? "👟" : item.category === "outerwear" ? "🧥" : "💍"}
+                </div>
+              )}
+              <div className={cn("absolute top-2 right-2 w-3 h-3 rounded-full ring-2 ring-card", item.cleanliness === "clean" ? "bg-clean" : item.cleanliness === "worn" ? "bg-worn" : "bg-dirty")} />
+            </div>
+            <div className="p-3 space-y-2">
+              <h3 className="font-medium text-sm truncate">{item.name}</h3>
+              <p className="text-xs text-muted-foreground">{item.color} · {item.fabric}</p>
+              <div className="flex gap-1.5">
+                {item.cleanliness !== "clean" && <Button size="sm" variant="outline" onClick={() => markAs(item.id, "clean")} className="text-xs flex-1 h-7">Clean</Button>}
+                {item.cleanliness === "clean" && <Button size="sm" variant="outline" onClick={() => markAs(item.id, "worn")} className="text-xs flex-1 h-7">Worn</Button>}
+                {item.cleanliness !== "dirty" && <Button size="sm" variant="outline" onClick={() => markAs(item.id, "dirty")} className="text-xs flex-1 h-7 text-destructive border-destructive/30">Wash</Button>}
+              </div>
             </div>
           </motion.div>
         ))}
