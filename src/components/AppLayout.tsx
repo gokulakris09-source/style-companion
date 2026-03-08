@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Shirt, Calendar, Droplets, Sparkles, LayoutDashboard, History, LogOut, User } from "lucide-react";
+import { Shirt, Calendar, Droplets, Sparkles, LayoutDashboard, History, LogOut, User, Image as ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,8 @@ const navItems = [
   { to: "/wardrobe", label: "Wardrobe", icon: Shirt },
   { to: "/planner", label: "Planner", icon: Calendar },
   { to: "/laundry", label: "Laundry", icon: Droplets },
-  { to: "/suggestions", label: "Suggestions", icon: Sparkles },
+  { to: "/suggestions", label: "AI Outfits", icon: Sparkles },
+  { to: "/try-on", label: "Try-On", icon: ImageIcon },
   { to: "/history", label: "History", icon: History },
 ];
 

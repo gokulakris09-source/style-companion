@@ -10,6 +10,7 @@ import Wardrobe from "./pages/Wardrobe";
 import Planner from "./pages/Planner";
 import Laundry from "./pages/Laundry";
 import Suggestions from "./pages/Suggestions";
+import VirtualTryOn from "./pages/VirtualTryOn";
 import History from "./pages/History";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
@@ -38,6 +39,7 @@ function ProtectedRoutes() {
         <Route path="/planner" element={<Planner />} />
         <Route path="/laundry" element={<Laundry />} />
         <Route path="/suggestions" element={<Suggestions />} />
+        <Route path="/try-on" element={<VirtualTryOn />} />
         <Route path="/history" element={<History />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
