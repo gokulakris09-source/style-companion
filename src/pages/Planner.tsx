@@ -240,23 +240,20 @@ export default function Planner() {
                       <img src={previewImage} alt={`${day} outfit preview`} className="w-full h-full object-cover" />
                     </div>
                   )}
-                  <div className="flex gap-2 flex-wrap flex-1">
+                  <div className="flex gap-3 flex-wrap flex-1">
                     {dayItems.map((item) => (
-                      <div key={item.id} className="relative group">
-                        <div className="bg-secondary rounded-lg overflow-hidden flex items-center gap-2 pr-3">
-                          {/* Item thumbnail */}
-                          <div className="w-10 h-10 bg-muted shrink-0 overflow-hidden">
-                            {item.image_url ? (
-                              <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-sm">
-                                {item.category === "top" ? "👔" : item.category === "bottom" ? "👖" : item.category === "dress" ? "👗" : item.category === "footwear" ? "👟" : item.category === "outerwear" ? "🧥" : "💍"}
-                              </div>
-                            )}
-                          </div>
-                          <span className="text-sm">{item.name}</span>
-                          <button onClick={() => removeItem(day, item.id)} className="opacity-0 group-hover:opacity-100 transition-opacity ml-1"><X className="h-3 w-3 text-muted-foreground hover:text-foreground" /></button>
+                      <div key={item.id} className="relative group w-16">
+                        <div className="w-16 h-20 rounded-lg overflow-hidden bg-secondary shadow-sm">
+                          {item.image_url ? (
+                            <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-2xl">
+                              {item.category === "top" ? "👔" : item.category === "bottom" ? "👖" : item.category === "dress" ? "👗" : item.category === "footwear" ? "👟" : item.category === "outerwear" ? "🧥" : "💍"}
+                            </div>
+                          )}
                         </div>
+                        <p className="text-[10px] text-muted-foreground text-center mt-1 truncate">{item.name}</p>
+                        <button onClick={() => removeItem(day, item.id)} className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity bg-destructive text-destructive-foreground rounded-full w-4 h-4 flex items-center justify-center"><X className="h-2.5 w-2.5" /></button>
                       </div>
                     ))}
                   </div>
