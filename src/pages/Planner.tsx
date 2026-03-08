@@ -261,6 +261,8 @@ export default function Planner() {
                   {confirmedDays.has(day) && (
                     <span className="text-xs text-accent flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Saved</span>
                   )}
+                </div>
+              </div>
               {dayItems.length === 0 && !previewImage ? (
                 <p className="text-sm text-muted-foreground italic">No outfit planned</p>
               ) : (
