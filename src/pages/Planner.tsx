@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { useClothingItems, useOutfitPlans, useUpsertOutfitPlan, ClothingItemRow } from "@/hooks/useWardrobe";
+import { useClothingItems, useOutfitPlans, useUpsertOutfitPlan, useAddOutfitHistory, ClothingItemRow } from "@/hooks/useWardrobe";
+import { useAuth } from "@/contexts/AuthContext";
 import { Link } from "react-router-dom";
 import { DAYS } from "@/lib/types";
 import ClothingCard from "@/components/ClothingCard";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Sparkles, X, Plus, CalendarCheck, Loader2, Image as ImageIcon } from "lucide-react";
+import { Sparkles, X, Plus, CalendarCheck, Loader2, Image as ImageIcon, CheckCircle2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { startOfWeek, format } from "date-fns";
@@ -104,8 +105,11 @@ export default function Planner() {
   const { data: items = [] } = useClothingItems();
   const { data: plans = [] } = useOutfitPlans(weekStart);
   const upsertPlan = useUpsertOutfitPlan();
+  const addHistory = useAddOutfitHistory();
+  const { user } = useAuth();
   const [pickingDay, setPickingDay] = useState<string | null>(null);
   const [autoFilling, setAutoFilling] = useState(false);
+  const [confirmedDays, setConfirmedDays] = useState<Set<string>>(new Set());
 
   const getDayItemIds = (day: string): string[] => {
     const plan = plans.find((p) => p.day_of_week === day);
@@ -186,6 +190,29 @@ export default function Planner() {
     toast.success("Week cleared");
   };
 
+  const confirmWorn = (day: string) => {
+    const plan = plans.find((p) => p.day_of_week === day);
+    if (!plan || plan.item_ids.length === 0) { toast.error("No outfit to confirm"); return; }
+    // Calculate the actual date for this day of the week
+    const weekStartDate = new Date(weekStart + "T00:00:00");
+    const dayIndex = DAYS.indexOf(day);
+    const wornDate = new Date(weekStartDate);
+    wornDate.setDate(wornDate.getDate() + dayIndex);
+
+    addHistory.mutate({
+      item_ids: plan.item_ids,
+      image_url: plan.preview_image_url || undefined,
+      day_of_week: day,
+      worn_at: wornDate.toISOString(),
+    }, {
+      onSuccess: () => {
+        setConfirmedDays((prev) => new Set([...prev, day]));
+        toast.success(`${day}'s outfit saved to history!`);
+      },
+      onError: (err) => toast.error(err.message),
+    });
+  };
+
   const availableItems = items.filter((i) => i.cleanliness !== "dirty");
   const hasAnyPlans = plans.some((p) => p.item_ids.length > 0);
 
@@ -228,6 +255,12 @@ export default function Planner() {
                   <Button variant="outline" size="sm" onClick={() => autoFillDay(day)} className="gap-1 text-xs"><Sparkles className="h-3 w-3" /> Suggest</Button>
                   <Button variant="outline" size="sm" onClick={() => setPickingDay(day)} className="gap-1 text-xs"><Plus className="h-3 w-3" /> Add</Button>
                   {dayItems.length > 0 && <Button variant="ghost" size="sm" onClick={() => clearDay(day)} className="text-xs text-muted-foreground">Clear</Button>}
+                  {dayItems.length > 0 && !confirmedDays.has(day) && (
+                    <Button size="sm" onClick={() => confirmWorn(day)} className="gap-1 text-xs"><CheckCircle2 className="h-3 w-3" /> Worn</Button>
+                  )}
+                  {confirmedDays.has(day) && (
+                    <span className="text-xs text-accent flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Saved</span>
+                  )}
                 </div>
               </div>
               {dayItems.length === 0 && !previewImage ? (

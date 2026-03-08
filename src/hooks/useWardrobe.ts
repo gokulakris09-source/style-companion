@@ -147,6 +147,8 @@ export type OutfitHistoryRow = {
   ai_generated: boolean | null;
   rating: number | null;
   occasion: string | null;
+  image_url: string | null;
+  day_of_week: string | null;
   created_at: string;
 };
 
@@ -170,7 +172,7 @@ export function useAddOutfitHistory() {
   const qc = useQueryClient();
   const { user } = useAuth();
   return useMutation({
-    mutationFn: async (entry: { item_ids: string[]; notes?: string; ai_generated?: boolean; occasion?: string }) => {
+    mutationFn: async (entry: { item_ids: string[]; notes?: string; ai_generated?: boolean; occasion?: string; image_url?: string; day_of_week?: string; worn_at?: string }) => {
       const { data, error } = await supabase
         .from("outfit_history")
         .insert({ ...entry, user_id: user!.id })
