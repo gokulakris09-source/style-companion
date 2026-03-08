@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useClothingItems, ClothingItemRow } from "@/hooks/useWardrobe";
+import { useClothingItems, useUpsertOutfitPlan, ClothingItemRow } from "@/hooks/useWardrobe";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import ClothingCard from "@/components/ClothingCard";
@@ -12,11 +12,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import {
   Image as ImageIcon, Loader2, X, Shirt, RotateCcw,
   Heart, Share2, Trash2, Globe, Lock, Copy, Check,
-  Camera, Upload, UserCircle,
+  Camera, Upload, UserCircle, CalendarPlus,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { CATEGORIES } from "@/lib/types";
+import { CATEGORIES, DAYS } from "@/lib/types";
+import { startOfWeek, format } from "date-fns";
 
 const STYLE_OPTIONS = [
   { value: "modern editorial", label: "Editorial" },
