@@ -147,6 +147,8 @@ export type OutfitHistoryRow = {
   ai_generated: boolean | null;
   rating: number | null;
   occasion: string | null;
+  image_url: string | null;
+  day_of_week: string | null;
   created_at: string;
 };
 
