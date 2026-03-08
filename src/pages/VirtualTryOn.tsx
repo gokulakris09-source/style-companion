@@ -168,6 +168,8 @@ export default function VirtualTryOn() {
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [shareDialogItem, setShareDialogItem] = useState<GalleryItem | null>(null);
   const [copied, setCopied] = useState(false);
+  const [plannerDay, setPlannerDay] = useState<string | null>(null);
+  const [addingToPlanner, setAddingToPlanner] = useState(false);
 
   // User photo state
   const [userPhotoUrl, setUserPhotoUrl] = useState<string | null>(null);
