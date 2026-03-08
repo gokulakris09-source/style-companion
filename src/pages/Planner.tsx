@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useClothingItems, useOutfitPlans, useUpsertOutfitPlan, ClothingItemRow } from "@/hooks/useWardrobe";
+import { Link } from "react-router-dom";
 import { DAYS } from "@/lib/types";
 import ClothingCard from "@/components/ClothingCard";
 import { Button } from "@/components/ui/button";
