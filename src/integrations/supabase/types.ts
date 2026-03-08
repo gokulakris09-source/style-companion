@@ -110,6 +110,7 @@ export type Database = {
           day_of_week: string
           id: string
           item_ids: string[]
+          preview_image_url: string | null
           updated_at: string
           user_id: string
           week_start: string
@@ -119,6 +120,7 @@ export type Database = {
           day_of_week: string
           id?: string
           item_ids?: string[]
+          preview_image_url?: string | null
           updated_at?: string
           user_id: string
           week_start: string
@@ -128,6 +130,7 @@ export type Database = {
           day_of_week?: string
           id?: string
           item_ids?: string[]
+          preview_image_url?: string | null
           updated_at?: string
           user_id?: string
           week_start?: string
