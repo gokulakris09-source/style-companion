@@ -255,8 +255,12 @@ export default function Planner() {
                   <Button variant="outline" size="sm" onClick={() => autoFillDay(day)} className="gap-1 text-xs"><Sparkles className="h-3 w-3" /> Suggest</Button>
                   <Button variant="outline" size="sm" onClick={() => setPickingDay(day)} className="gap-1 text-xs"><Plus className="h-3 w-3" /> Add</Button>
                   {dayItems.length > 0 && <Button variant="ghost" size="sm" onClick={() => clearDay(day)} className="text-xs text-muted-foreground">Clear</Button>}
-                </div>
-              </div>
+                  {dayItems.length > 0 && !confirmedDays.has(day) && (
+                    <Button size="sm" onClick={() => confirmWorn(day)} className="gap-1 text-xs"><CheckCircle2 className="h-3 w-3" /> Worn</Button>
+                  )}
+                  {confirmedDays.has(day) && (
+                    <span className="text-xs text-accent flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Saved</span>
+                  )}
               {dayItems.length === 0 && !previewImage ? (
                 <p className="text-sm text-muted-foreground italic">No outfit planned</p>
               ) : (
