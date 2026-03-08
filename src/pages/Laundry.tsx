@@ -1,6 +1,5 @@
 import { useMemo } from "react";
 import { useClothingItems, useUpdateClothingItem, ClothingItemRow } from "@/hooks/useWardrobe";
-import ClothingCard from "@/components/ClothingCard";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
