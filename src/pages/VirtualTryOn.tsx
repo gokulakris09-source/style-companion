@@ -232,7 +232,7 @@ export default function VirtualTryOn() {
     try {
       const { data, error } = await supabase.functions.invoke("virtual-tryon", {
         body: {
-          items: selectedItems.map((i) => ({ name: i.name, category: i.category, color: i.color, fabric: i.fabric })),
+          items: selectedItems.map((i) => ({ name: i.name, category: i.category, color: i.color, fabric: i.fabric, image_url: i.image_url || undefined })),
           style, background, userPhotoUrl: userPhotoUrl || undefined,
         },
       });
