@@ -39,6 +39,7 @@ function ProtectedRoutes() {
         <Route path="/planner" element={<Planner />} />
         <Route path="/laundry" element={<Laundry />} />
         <Route path="/suggestions" element={<Suggestions />} />
+        <Route path="/try-on" element={<VirtualTryOn />} />
         <Route path="/history" element={<History />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
