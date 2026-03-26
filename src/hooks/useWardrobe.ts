@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
+
+// Fixed anonymous user ID since auth is disabled
+const ANON_USER_ID = "00000000-0000-0000-0000-000000000000";
 
 export type ClothingItemRow = {
   id: string;
