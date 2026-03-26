@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useClothingItems, useOutfitPlans, useUpsertOutfitPlan, useAddOutfitHistory, ClothingItemRow } from "@/hooks/useWardrobe";
-import { useAuth } from "@/contexts/AuthContext";
 import { Link } from "react-router-dom";
 import { DAYS } from "@/lib/types";
 import ClothingCard from "@/components/ClothingCard";
@@ -106,7 +105,7 @@ export default function Planner() {
   const { data: plans = [] } = useOutfitPlans(weekStart);
   const upsertPlan = useUpsertOutfitPlan();
   const addHistory = useAddOutfitHistory();
-  const { user } = useAuth();
+
   const [pickingDay, setPickingDay] = useState<string | null>(null);
   const [autoFilling, setAutoFilling] = useState(false);
   const [confirmedDays, setConfirmedDays] = useState<Set<string>>(new Set());
