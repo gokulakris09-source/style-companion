@@ -27,100 +27,20 @@ serve(async (req) => {
     const styleHint = style || "modern editorial";
     const bgHint = background || "clean studio with soft lighting";
 
-    // Collect clothing image URLs for visual reference
-    const clothingImageParts: any[] = [];
-    for (const item of items) {
-      if (item.image_url) {
-        clothingImageParts.push({
-          type: "image_url",
-          image_url: { url: item.image_url },
-        });
-      }
-    }
+    // Build a simple text-only prompt for fastest generation
+    const outfitDescription = items
+      .map((item: any) => `${item.color} ${item.fabric} ${item.name} (${item.category})`)
+      .join(", ");
 
-    const hasClothingImages = clothingImageParts.length > 0;
+    const styleHint = style || "modern editorial";
+    const bgHint = background || "clean studio with soft lighting";
 
-    // Build messages based on whether user photo and clothing images are provided
-    let messages: any[];
-
-    if (userPhotoUrl) {
-      // Photo-based try-on with actual clothing images
-      const contentParts: any[] = [
-        {
-          type: "text",
-          text: `You are a professional virtual try-on AI specializing in realistic clothing visualization.
-
-TASK: Dress the person in the provided photo wearing EXACTLY the clothing items shown in the reference images below.
-
-Person's photo is the FIRST image. The subsequent images are the EXACT clothing items to apply:
-${items.map((item: any, idx: number) => `- Clothing ${idx + 1}: ${item.color} ${item.fabric} ${item.name} (${item.category})`).join("\n")}
-
-Style direction: ${styleHint}
-Background: ${bgHint}
-
-CRITICAL REQUIREMENTS:
-1. PRESERVE THE PERSON EXACTLY: Keep their face, body shape, skin tone, hair, and pose identical to the input photo
-2. USE THE EXACT CLOTHING from the reference images — match the precise color, pattern, texture, fabric weave, and design details of each garment
-3. FIT NATURALLY: The clothing must conform to the person's body proportions with realistic draping, wrinkles, folds, and shadows where fabric meets the body
-4. CORRECT LAYERING: Place items in proper order (e.g., shirt under jacket, pants at waist level, accessories on top)
-5. LIGHTING CONSISTENCY: Match the lighting on the clothing to the original photo's lighting direction and intensity
-6. PHOTOREALISTIC OUTPUT: The final image must look like a real high-resolution photograph — no artificial look, no cartoon style, no distortions
-7. COLOR ACCURACY: The colors of each garment must exactly match the reference clothing images
-8. No text, watermarks, logos, or artifacts`,
-        },
-        { type: "image_url", image_url: { url: userPhotoUrl } },
-        ...clothingImageParts,
-      ];
-
-      messages = [{ role: "user", content: contentParts }];
-    } else if (hasClothingImages) {
-      // No user photo but has clothing images — use a model wearing the exact clothes
-      const contentParts: any[] = [
-        {
-          type: "text",
-          text: `You are a professional virtual try-on AI. Generate a photorealistic full-body fashion photograph of a model wearing EXACTLY the clothing items shown in the reference images below.
-
-The images provided are the EXACT clothing items to use:
-${items.map((item: any, idx: number) => `- Clothing ${idx + 1}: ${item.color} ${item.fabric} ${item.name} (${item.category})`).join("\n")}
-
-Style direction: ${styleHint}
-Background: ${bgHint}
-
-CRITICAL REQUIREMENTS:
-1. USE THE EXACT CLOTHING from each reference image — replicate the precise color, pattern, texture, fabric weave, and all design details
-2. Show the complete outfit on a single model in a natural, confident pose from head to toe
-3. The clothing must fit the model naturally with realistic draping, wrinkles, and shadows
-4. Correct layering order (undergarments covered by outer layers, accessories visible)
-5. Professional studio-quality lighting with soft shadows
-6. Photorealistic quality — like a professional lookbook or fashion editorial photograph
-7. COLOR ACCURACY: Each garment's colors must exactly match the reference images
-8. No text, watermarks, logos, or artifacts`,
-        },
-        ...clothingImageParts,
-      ];
-
-      messages = [{ role: "user", content: contentParts }];
-    } else {
-      // Fallback: no images at all, use text description only
-      messages = [
-        {
-          role: "user",
-          content: `Create a highly realistic, full-body fashion photograph of a stylish model wearing the following outfit: ${outfitDescription}.
-
-Style direction: ${styleHint}
-Background: ${bgHint}
-
-Important requirements:
-- Photorealistic quality, like a professional lookbook or fashion magazine editorial
-- Show the complete outfit from head to toe on a single model in a natural, confident pose
-- Accurate fabric textures: show how the materials drape, fold, and reflect light realistically
-- Correct color representation for each garment
-- Professional studio lighting with soft shadows
-- The outfit should look cohesive and styled together as one complete look
-- No text, watermarks, or logos in the image`,
-        },
-      ];
-    }
+    const messages = [
+      {
+        role: "user",
+        content: `Create a photorealistic full-body fashion photograph of a model wearing: ${outfitDescription}. Style: ${styleHint}. Background: ${bgHint}. Show complete outfit head to toe, natural pose, professional lighting. No text or watermarks.`,
+      },
+    ];
 
     // Retry logic: up to 2 attempts, fallback to text-only on second attempt
     const MAX_ATTEMPTS = 2;
