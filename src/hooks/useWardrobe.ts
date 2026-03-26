@@ -23,9 +23,8 @@ export type ClothingItemRow = {
 };
 
 export function useClothingItems() {
-  const { user } = useAuth();
   return useQuery({
-    queryKey: ["clothing_items", user?.id],
+    queryKey: ["clothing_items"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("clothing_items")
@@ -34,18 +33,16 @@ export function useClothingItems() {
       if (error) throw error;
       return data as ClothingItemRow[];
     },
-    enabled: !!user,
   });
 }
 
 export function useAddClothingItem() {
   const qc = useQueryClient();
-  const { user } = useAuth();
   return useMutation({
     mutationFn: async (item: Omit<ClothingItemRow, "id" | "user_id" | "created_at" | "updated_at" | "usage_count" | "last_worn_at">) => {
       const { data, error } = await supabase
         .from("clothing_items")
-        .insert({ ...item, user_id: user!.id })
+        .insert({ ...item, user_id: ANON_USER_ID })
         .select()
         .single();
       if (error) throw error;
@@ -96,9 +93,8 @@ export type OutfitPlanRow = {
 };
 
 export function useOutfitPlans(weekStart: string) {
-  const { user } = useAuth();
   return useQuery({
-    queryKey: ["outfit_plans", user?.id, weekStart],
+    queryKey: ["outfit_plans", weekStart],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("outfit_plans")
@@ -107,13 +103,11 @@ export function useOutfitPlans(weekStart: string) {
       if (error) throw error;
       return data as OutfitPlanRow[];
     },
-    enabled: !!user,
   });
 }
 
 export function useUpsertOutfitPlan() {
   const qc = useQueryClient();
-  const { user } = useAuth();
   return useMutation({
     mutationFn: async ({
       day_of_week,
@@ -126,7 +120,7 @@ export function useUpsertOutfitPlan() {
       item_ids: string[];
       preview_image_url?: string | null;
     }) => {
-      const payload: any = { user_id: user!.id, day_of_week, week_start, item_ids };
+      const payload: any = { user_id: ANON_USER_ID, day_of_week, week_start, item_ids };
       if (preview_image_url !== undefined) payload.preview_image_url = preview_image_url;
       const { data, error } = await supabase
         .from("outfit_plans")
@@ -155,9 +149,8 @@ export type OutfitHistoryRow = {
 };
 
 export function useOutfitHistory() {
-  const { user } = useAuth();
   return useQuery({
-    queryKey: ["outfit_history", user?.id],
+    queryKey: ["outfit_history"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("outfit_history")
@@ -166,18 +159,16 @@ export function useOutfitHistory() {
       if (error) throw error;
       return data as OutfitHistoryRow[];
     },
-    enabled: !!user,
   });
 }
 
 export function useAddOutfitHistory() {
   const qc = useQueryClient();
-  const { user } = useAuth();
   return useMutation({
     mutationFn: async (entry: { item_ids: string[]; notes?: string; ai_generated?: boolean; occasion?: string; image_url?: string; day_of_week?: string; worn_at?: string }) => {
       const { data, error } = await supabase
         .from("outfit_history")
-        .insert({ ...entry, user_id: user!.id })
+        .insert({ ...entry, user_id: ANON_USER_ID })
         .select()
         .single();
       if (error) throw error;
@@ -202,11 +193,10 @@ export function useUpdateOutfitHistory() {
 }
 // Image upload
 export function useUploadClothingImage() {
-  const { user } = useAuth();
   return useMutation({
     mutationFn: async (file: File) => {
       const ext = file.name.split(".").pop();
-      const path = `${user!.id}/${crypto.randomUUID()}.${ext}`;
+      const path = `${ANON_USER_ID}/${crypto.randomUUID()}.${ext}`;
       const { error } = await supabase.storage.from("clothing-images").upload(path, file);
       if (error) throw error;
       const { data } = supabase.storage.from("clothing-images").getPublicUrl(path);
