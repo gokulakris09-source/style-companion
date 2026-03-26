@@ -64,7 +64,6 @@ function useGallery() {
 
 function useSaveToGallery() {
   const qc = useQueryClient();
-  const { user } = useAuth();
   return useMutation({
     mutationFn: async ({ base64Image, itemNames, style, background, description }: {
       base64Image: string; itemNames: string[]; style: string; background: string; description: string;
@@ -74,13 +73,13 @@ function useSaveToGallery() {
       const bytes = new Uint8Array(byteString.length);
       for (let i = 0; i < byteString.length; i++) bytes[i] = byteString.charCodeAt(i);
       const blob = new Blob([bytes], { type: "image/png" });
-      const path = `${user!.id}/${crypto.randomUUID()}.png`;
+      const path = `${ANON_USER_ID}/${crypto.randomUUID()}.png`;
       const { error: uploadError } = await supabase.storage.from("tryon-images").upload(path, blob);
       if (uploadError) throw uploadError;
       const { data: urlData } = supabase.storage.from("tryon-images").getPublicUrl(path);
       const { data, error } = await supabase
         .from("tryon_gallery")
-        .insert({ user_id: user!.id, image_url: urlData.publicUrl, item_names: itemNames, style, background, description })
+        .insert({ user_id: ANON_USER_ID, image_url: urlData.publicUrl, item_names: itemNames, style, background, description })
         .select().single();
       if (error) throw error;
       return data;
@@ -112,11 +111,10 @@ function useDeleteGalleryItem() {
 }
 
 function useUploadUserPhoto() {
-  const { user } = useAuth();
   return useMutation({
     mutationFn: async (file: File) => {
       const ext = file.name.split(".").pop() || "jpg";
-      const path = `${user!.id}/user-photo-${crypto.randomUUID()}.${ext}`;
+      const path = `${ANON_USER_ID}/user-photo-${crypto.randomUUID()}.${ext}`;
       const { error } = await supabase.storage.from("tryon-images").upload(path, file);
       if (error) throw error;
       const { data } = supabase.storage.from("tryon-images").getPublicUrl(path);
@@ -150,7 +148,7 @@ function ClothingThumb({ item, onRemove }: { item: ClothingItemRow; onRemove: ()
 }
 
 export default function VirtualTryOn() {
-  const { user } = useAuth();
+  
   const { data: items = [] } = useClothingItems();
   const { data: gallery = [] } = useGallery();
   const saveToGallery = useSaveToGallery();
