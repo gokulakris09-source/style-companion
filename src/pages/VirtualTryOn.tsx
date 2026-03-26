@@ -46,20 +46,19 @@ type GalleryItem = {
   created_at: string;
 };
 
+const ANON_USER_ID = "00000000-0000-0000-0000-000000000000";
+
 function useGallery() {
-  const { user } = useAuth();
   return useQuery({
-    queryKey: ["tryon_gallery", user?.id],
+    queryKey: ["tryon_gallery"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("tryon_gallery")
         .select("*")
-        .eq("user_id", user!.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data as GalleryItem[];
     },
-    enabled: !!user,
   });
 }
 

@@ -105,7 +105,7 @@ export default function Planner() {
   const { data: plans = [] } = useOutfitPlans(weekStart);
   const upsertPlan = useUpsertOutfitPlan();
   const addHistory = useAddOutfitHistory();
-  const { user } = useAuth();
+
   const [pickingDay, setPickingDay] = useState<string | null>(null);
   const [autoFilling, setAutoFilling] = useState(false);
   const [confirmedDays, setConfirmedDays] = useState<Set<string>>(new Set());
