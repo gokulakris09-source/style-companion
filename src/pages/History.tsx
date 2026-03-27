@@ -328,10 +328,27 @@ export default function History() {
               {history.map((entry, i) => (
                 <motion.div key={entry.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }} className="bg-card border rounded-lg p-4">
                   <div className="flex items-start gap-4">
-                    {/* Outfit image thumbnail */}
-                    {entry.image_url && (
+                    {/* Outfit image thumbnail or item thumbnails fallback */}
+                    {entry.image_url ? (
                       <div className="w-20 h-24 rounded-lg overflow-hidden bg-secondary shrink-0 shadow-sm">
                         <img src={entry.image_url} alt="Outfit" className="w-full h-full object-cover" />
+                      </div>
+                    ) : (
+                      <div className="w-20 h-24 rounded-lg overflow-hidden bg-secondary shrink-0 shadow-sm grid grid-cols-2 gap-0.5 p-0.5">
+                        {entry.item_ids.slice(0, 4).map((id) => {
+                          const item = getItem(id);
+                          return (
+                            <div key={id} className="rounded-sm overflow-hidden bg-muted">
+                              {item?.image_url ? (
+                                <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-xs">
+                                  {item?.category === "top" ? "👔" : item?.category === "bottom" ? "👖" : item?.category === "dress" ? "👗" : "👟"}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
