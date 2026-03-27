@@ -1,40 +1,31 @@
-import { useState } from "react";
-import { useClothingItems, useOutfitPlans, useUpsertOutfitPlan, useAddOutfitHistory, ClothingItemRow } from "@/hooks/useWardrobe";
+import { useState, useMemo } from "react";
+import { useClothingItems, useOutfitPlans, useUpsertOutfitPlan, useAddOutfitHistory, useOutfitHistory, ClothingItemRow } from "@/hooks/useWardrobe";
 import { Link } from "react-router-dom";
 import { DAYS } from "@/lib/types";
 import ClothingCard from "@/components/ClothingCard";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Sparkles, X, Plus, CalendarCheck, Loader2, Image as ImageIcon, CheckCircle2 } from "lucide-react";
+import { Sparkles, X, Plus, CalendarCheck, Loader2, Image as ImageIcon, CheckCircle2, Trash2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { startOfWeek, format } from "date-fns";
+import { startOfWeek, format, addDays } from "date-fns";
 
 function getWeekStart() {
   return format(startOfWeek(new Date(), { weekStartsOn: 1 }), "yyyy-MM-dd");
 }
 
-/** Determine current season from date */
 function getCurrentSeason(): string {
-  const month = new Date().getMonth(); // 0-indexed
+  const month = new Date().getMonth();
   if (month >= 2 && month <= 4) return "spring";
   if (month >= 5 && month <= 7) return "summer";
   if (month >= 8 && month <= 10) return "fall";
   return "winter";
 }
 
-/**
- * Smart auto-fill algorithm for the entire week.
- * - Only uses clean items
- * - Prefers items matching current season (or "all")
- * - Sorts by least-used first to promote wardrobe rotation
- * - No item is repeated across the week
- */
 function generateWeekPlan(items: ClothingItemRow[]): Record<string, string[]> {
   const season = getCurrentSeason();
   const clean = items.filter((i) => i.cleanliness !== "dirty");
 
-  // Partition by category, prefer seasonal match, sort by usage_count asc
   const byCat = (cat: string) =>
     clean
       .filter((i) => i.category === cat)
@@ -59,7 +50,6 @@ function generateWeekPlan(items: ClothingItemRow[]): Record<string, string[]> {
 
   for (const day of DAYS) {
     const dayItems: string[] = [];
-
     const pickFrom = (cat: string): ClothingItemRow | null => {
       const pool = pools[cat];
       if (!pool) return null;
@@ -67,7 +57,6 @@ function generateWeekPlan(items: ClothingItemRow[]): Record<string, string[]> {
       return available.length > 0 ? available[0] : null;
     };
 
-    // Try dress first; if none, pick top + bottom
     const dress = pickFrom("dress");
     if (dress) {
       dayItems.push(dress.id);
@@ -79,17 +68,14 @@ function generateWeekPlan(items: ClothingItemRow[]): Record<string, string[]> {
       if (bottom) { dayItems.push(bottom.id); usedIds.add(bottom.id); }
     }
 
-    // Always try footwear
     const shoes = pickFrom("footwear");
     if (shoes) { dayItems.push(shoes.id); usedIds.add(shoes.id); }
 
-    // Add outerwear in cold seasons
     if (season === "winter" || season === "fall") {
       const outer = pickFrom("outerwear");
       if (outer) { dayItems.push(outer.id); usedIds.add(outer.id); }
     }
 
-    // Optionally add an accessory
     const acc = pickFrom("accessory");
     if (acc) { dayItems.push(acc.id); usedIds.add(acc.id); }
 
@@ -102,13 +88,28 @@ function generateWeekPlan(items: ClothingItemRow[]): Record<string, string[]> {
 export default function Planner() {
   const weekStart = getWeekStart();
   const { data: items = [] } = useClothingItems();
-  const { data: plans = [] } = useOutfitPlans(weekStart);
+  const { data: plans = [], isLoading: plansLoading } = useOutfitPlans(weekStart);
+  const { data: history = [] } = useOutfitHistory();
   const upsertPlan = useUpsertOutfitPlan();
   const addHistory = useAddOutfitHistory();
 
   const [pickingDay, setPickingDay] = useState<string | null>(null);
   const [autoFilling, setAutoFilling] = useState(false);
-  const [confirmedDays, setConfirmedDays] = useState<Set<string>>(new Set());
+  const [clearing, setClearing] = useState(false);
+
+  // Check which days already have history entries for this week
+  const historyDays = useMemo(() => {
+    const weekStartDate = new Date(weekStart + "T00:00:00");
+    const weekEndDate = addDays(weekStartDate, 7);
+    const set = new Set<string>();
+    history.forEach((h) => {
+      const wornDate = new Date(h.worn_at);
+      if (wornDate >= weekStartDate && wornDate < weekEndDate) {
+        if (h.day_of_week) set.add(h.day_of_week);
+      }
+    });
+    return set;
+  }, [history, weekStart]);
 
   const getDayItemIds = (day: string): string[] => {
     const plan = plans.find((p) => p.day_of_week === day);
@@ -134,28 +135,27 @@ export default function Planner() {
   };
 
   const clearDay = (day: string) => {
-    upsertPlan.mutate({ day_of_week: day, week_start: weekStart, item_ids: [] });
-  };
-
-  const autoFillDay = (day: string) => {
-    const usedIds = plans.flatMap((p) => p.item_ids);
-    const available = items.filter((i) => i.cleanliness !== "dirty" && !usedIds.includes(i.id));
-    const pick = (cat: string) => {
-      const pool = available.filter((i) => i.category === cat);
-      return pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
-    };
-    const suggestion = [pick("top"), pick("bottom"), pick("footwear")].filter(Boolean) as ClothingItemRow[];
-    if (suggestion.length === 0) { toast.error("No clean items available"); return; }
-    const currentIds = getDayItemIds(day);
-    const newIds = [...currentIds, ...suggestion.map((s) => s.id)];
-    upsertPlan.mutate({ day_of_week: day, week_start: weekStart, item_ids: newIds });
-    toast.success(`Added ${suggestion.length} items to ${day}`);
+    upsertPlan.mutate(
+      { day_of_week: day, week_start: weekStart, item_ids: [] },
+      { onSuccess: () => toast.success(`${day} cleared`) }
+    );
   };
 
   const autoFillWeek = async () => {
     if (items.length === 0) { toast.error("Add items to your wardrobe first"); return; }
     setAutoFilling(true);
     try {
+      // First clear all days sequentially
+      for (const day of DAYS) {
+        await new Promise<void>((resolve, reject) => {
+          upsertPlan.mutate(
+            { day_of_week: day, week_start: weekStart, item_ids: [] },
+            { onSuccess: () => resolve(), onError: (err) => reject(err) }
+          );
+        });
+      }
+
+      // Then fill with new plan
       const weekPlan = generateWeekPlan(items);
       let filledDays = 0;
       for (const day of DAYS) {
@@ -182,17 +182,28 @@ export default function Planner() {
     }
   };
 
-  const clearWeek = () => {
-    DAYS.forEach((day) => {
-      upsertPlan.mutate({ day_of_week: day, week_start: weekStart, item_ids: [] });
-    });
-    toast.success("Week cleared");
+  const clearWeek = async () => {
+    setClearing(true);
+    try {
+      for (const day of DAYS) {
+        await new Promise<void>((resolve, reject) => {
+          upsertPlan.mutate(
+            { day_of_week: day, week_start: weekStart, item_ids: [] },
+            { onSuccess: () => resolve(), onError: (err) => reject(err) }
+          );
+        });
+      }
+      toast.success("Week cleared");
+    } catch {
+      toast.error("Failed to clear week");
+    } finally {
+      setClearing(false);
+    }
   };
 
   const confirmWorn = (day: string) => {
     const plan = plans.find((p) => p.day_of_week === day);
     if (!plan || plan.item_ids.length === 0) { toast.error("No outfit to confirm"); return; }
-    // Calculate the actual date for this day of the week
     const weekStartDate = new Date(weekStart + "T00:00:00");
     const dayIndex = DAYS.indexOf(day);
     const wornDate = new Date(weekStartDate);
@@ -205,7 +216,6 @@ export default function Planner() {
       worn_at: wornDate.toISOString(),
     }, {
       onSuccess: () => {
-        setConfirmedDays((prev) => new Set([...prev, day]));
         toast.success(`${day}'s outfit saved to history!`);
       },
       onError: (err) => toast.error(err.message),
@@ -223,12 +233,15 @@ export default function Planner() {
           <p className="text-muted-foreground mt-1">Week of {weekStart}</p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={autoFillWeek} disabled={autoFilling} className="gap-2">
+          <Button onClick={autoFillWeek} disabled={autoFilling || clearing} className="gap-2">
             {autoFilling ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarCheck className="h-4 w-4" />}
             {autoFilling ? "Planning..." : "Auto-Fill Week"}
           </Button>
           {hasAnyPlans && (
-            <Button variant="outline" onClick={clearWeek} className="text-sm">Clear Week</Button>
+            <Button variant="outline" onClick={clearWeek} disabled={clearing || autoFilling} className="gap-2 text-sm">
+              {clearing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              {clearing ? "Clearing..." : "Clear Week"}
+            </Button>
           )}
         </div>
       </div>
@@ -243,22 +256,26 @@ export default function Planner() {
           const dayItems = getDayItems(day);
           const plan = plans.find((p) => p.day_of_week === day);
           const previewImage = plan?.preview_image_url;
+          const isInHistory = historyDays.has(day);
           return (
             <motion.div key={day} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }} className="bg-card border rounded-lg p-4">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="font-display font-semibold">{day}</h3>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-display font-semibold">{day}</h3>
+                  {isInHistory && (
+                    <span className="text-[10px] bg-accent/10 text-accent px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <CheckCircle2 className="h-2.5 w-2.5" /> In History
+                    </span>
+                  )}
+                </div>
+                <div className="flex gap-2 flex-wrap justify-end">
                   <Link to="/try-on">
                     <Button variant="outline" size="sm" className="gap-1 text-xs"><ImageIcon className="h-3 w-3" /> Try-On</Button>
                   </Link>
-                  <Button variant="outline" size="sm" onClick={() => autoFillDay(day)} className="gap-1 text-xs"><Sparkles className="h-3 w-3" /> Suggest</Button>
                   <Button variant="outline" size="sm" onClick={() => setPickingDay(day)} className="gap-1 text-xs"><Plus className="h-3 w-3" /> Add</Button>
                   {dayItems.length > 0 && <Button variant="ghost" size="sm" onClick={() => clearDay(day)} className="text-xs text-muted-foreground">Clear</Button>}
-                  {dayItems.length > 0 && !confirmedDays.has(day) && (
+                  {dayItems.length > 0 && !isInHistory && (
                     <Button size="sm" onClick={() => confirmWorn(day)} className="gap-1 text-xs"><CheckCircle2 className="h-3 w-3" /> Worn</Button>
-                  )}
-                  {confirmedDays.has(day) && (
-                    <span className="text-xs text-accent flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Saved</span>
                   )}
                 </div>
               </div>
@@ -266,7 +283,6 @@ export default function Planner() {
                 <p className="text-sm text-muted-foreground italic">No outfit planned</p>
               ) : (
                 <div className="flex gap-3 items-start">
-                  {/* Preview image from try-on */}
                   {previewImage && (
                     <div className="w-24 h-32 rounded-lg overflow-hidden bg-secondary shrink-0 shadow-md">
                       <img src={previewImage} alt={`${day} outfit preview`} className="w-full h-full object-cover" />
