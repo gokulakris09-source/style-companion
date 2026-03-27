@@ -31,18 +31,28 @@ serve(async (req) => {
 
     console.log("Generating try-on image...");
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3.1-flash-image-preview",
-        messages: [{ role: "user", content: prompt }],
-        modalities: ["image", "text"],
-      }),
-    });
+    const makeRequest = async () => {
+      return await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-3.1-flash-image-preview",
+          messages: [{ role: "user", content: prompt }],
+          modalities: ["image", "text"],
+        }),
+      });
+    };
+
+    let response = await makeRequest();
+    // Retry up to 2 times on rate limit with increasing delay
+    for (let attempt = 1; attempt <= 2 && response.status === 429; attempt++) {
+      console.log(`Rate limited, retrying in ${attempt * 5}s (attempt ${attempt}/2)...`);
+      await new Promise(r => setTimeout(r, attempt * 5000));
+      response = await makeRequest();
+    }
 
     if (!response.ok) {
       if (response.status === 429) {
