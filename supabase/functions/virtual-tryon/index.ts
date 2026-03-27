@@ -9,7 +9,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { items, style, background } = await req.json();
+    const { items, style, background, userPhotoUrl } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
@@ -27,9 +27,42 @@ serve(async (req) => {
     const styleHint = style || "modern editorial";
     const bgHint = background || "clean studio with soft lighting";
 
-    const prompt = `Create a photorealistic full-body fashion photograph of a model wearing: ${outfitDescription}. Style: ${styleHint}. Background: ${bgHint}. Show complete outfit head to toe, natural pose, professional lighting, accurate colors and fabric textures. No text or watermarks.`;
+    // Build multimodal content array
+    const content: any[] = [];
 
-    console.log("Generating try-on image...");
+    // Add user photo if provided
+    if (userPhotoUrl) {
+      content.push({
+        type: "text",
+        text: "Here is the person's photo. Generate an image of THIS EXACT person wearing the outfit described below. Preserve their face, body type, skin tone, and hair exactly.",
+      });
+      content.push({
+        type: "image_url",
+        image_url: { url: userPhotoUrl },
+      });
+    }
+
+    // Add each clothing item image
+    const itemsWithImages = items.filter((item: any) => item.image_url);
+    for (const item of itemsWithImages) {
+      content.push({
+        type: "text",
+        text: `This is the ${item.category} item "${item.name}" (${item.color} ${item.fabric}). Use this EXACT clothing piece in the output:`,
+      });
+      content.push({
+        type: "image_url",
+        image_url: { url: item.image_url },
+      });
+    }
+
+    // Add the main prompt
+    const mainPrompt = userPhotoUrl
+      ? `Now generate a photorealistic full-body image of the person from the photo above wearing EXACTLY these clothing items: ${outfitDescription}. The clothes must match the provided images exactly — same color, pattern, fabric texture, and design details. Style: ${styleHint}. Background: ${bgHint}. Natural pose, professional lighting. Preserve the person's appearance faithfully. No text or watermarks.`
+      : `Generate a photorealistic full-body fashion photograph of a model wearing EXACTLY these clothing items: ${outfitDescription}. ${itemsWithImages.length > 0 ? "The clothes must match the provided images exactly — same color, pattern, fabric texture, and design details." : "Accurately represent the described colors and fabric textures."} Style: ${styleHint}. Background: ${bgHint}. Show complete outfit head to toe, natural pose, professional lighting. No text or watermarks.`;
+
+    content.push({ type: "text", text: mainPrompt });
+
+    console.log("Generating try-on image with", itemsWithImages.length, "clothing images and", userPhotoUrl ? "user photo" : "no user photo");
 
     const makeRequest = async () => {
       return await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -40,14 +73,13 @@ serve(async (req) => {
         },
         body: JSON.stringify({
           model: "google/gemini-3.1-flash-image-preview",
-          messages: [{ role: "user", content: prompt }],
+          messages: [{ role: "user", content }],
           modalities: ["image", "text"],
         }),
       });
     };
 
     let response = await makeRequest();
-    // Retry up to 2 times on rate limit with increasing delay
     for (let attempt = 1; attempt <= 2 && response.status === 429; attempt++) {
       console.log(`Rate limited, retrying in ${attempt * 5}s (attempt ${attempt}/2)...`);
       await new Promise(r => setTimeout(r, attempt * 5000));
