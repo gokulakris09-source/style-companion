@@ -29,6 +29,7 @@ export function useClothingItems() {
       const { data, error } = await supabase
         .from("clothing_items")
         .select("*")
+        .eq("user_id", ANON_USER_ID)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data as ClothingItemRow[];
