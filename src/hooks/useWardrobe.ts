@@ -100,7 +100,8 @@ export function useOutfitPlans(weekStart: string) {
       const { data, error } = await supabase
         .from("outfit_plans")
         .select("*")
-        .eq("week_start", weekStart);
+        .eq("week_start", weekStart)
+        .eq("user_id", ANON_USER_ID);
       if (error) throw error;
       return data as OutfitPlanRow[];
     },
