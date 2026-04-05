@@ -155,7 +155,6 @@ export function useOutfitHistory() {
       const { data, error } = await supabase
         .from("outfit_history")
         .select("*")
-        .eq("user_id", ANON_USER_ID)
         .order("worn_at", { ascending: false });
       if (error) throw error;
       return data as OutfitHistoryRow[];
